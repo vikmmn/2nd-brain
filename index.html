@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2nd Brain Notes</title>
+<meta name="theme-color" content="#2c6e63">
+<meta name="description" content="Read and edit your Obsidian vault in Google Drive from any device.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: one column under a sticky top bar. Views: sign-in, folder list, note (Read / Edit), file. */
+  :root {
+    --paper: #f7f7f4;
+    --surface: #ffffff;
+    --ink: #1f2328;
+    --muted: #66707a;
+    --rule: #dfe1dc;
+    --accent: #2c6e63;
+    --accent-ink: #ffffff;
+    --warn-bg: #fdf3d8;
+    --warn-ink: #6b4e00;
+    --bad: #a33a2b;
+    --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #15181b; --surface: #1c2024; --ink: #e6e8e6; --muted: #98a1a8; --rule: #2c3237;
+      --accent: #6cc0ae; --accent-ink: #0d1f1b; --warn-bg: #3a3116; --warn-ink: #f1d98d; --bad: #f08a7a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: var(--paper); color: var(--ink); font: 16px/1.55 var(--font-body);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  .bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--rule); }
+  .bar h1 { flex: 1; min-width: 0; margin: 0; font: 600 18px/1.25 var(--font-display);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .state { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .state.bad { color: var(--bad); }
+
+  button { font: 500 15px/1 var(--font-body); color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, li:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  main { max-width: 760px; margin: 0 auto; padding: 8px 16px 72px; }
+  .row { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+  .row input { flex: 1; min-width: 0; font: 15px var(--font-body); color: var(--ink); background: var(--surface);
+    border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; }
+  .crumbs { font-size: 13px; color: var(--muted); margin: 6px 0 2px; overflow-wrap: anywhere; }
+
+  ul.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  ul.list li { display: flex; align-items: baseline; gap: 12px; padding: 13px 4px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+  ul.list li .kind { font: 500 11px/1 var(--font-mono); letter-spacing: .04em; color: var(--muted); width: 40px; flex: none; text-transform: uppercase; }
+  ul.list li.folder .kind { color: var(--accent); }
+  ul.list li .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  ul.list li .date { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty, .loading { color: var(--muted); padding: 18px 4px; }
+
+  .notice { border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: var(--warn-bg); color: var(--warn-ink); }
+  .notice b { display: block; margin-bottom: 4px; }
+  .notice .row { margin-bottom: 0; }
+
+  .welcome { max-width: 460px; margin: 12vh auto 0; text-align: left; }
+  .welcome img { width: 72px; height: 72px; border-radius: 16px; }
+  .welcome h2 { font: 600 30px/1.15 var(--font-display); margin: 16px 0 8px; text-wrap: balance; }
+  .welcome p { color: var(--muted); margin: 0 0 18px; }
+
+  #editor { display: block; width: 100%; min-height: 70vh; border: 0; outline: 0; resize: none;
+    background: transparent; color: var(--ink); font: 15px/1.65 var(--font-mono); padding: 10px 0; }
+  #reader { padding: 6px 0; overflow-wrap: anywhere; max-width: 68ch; }
+  #reader h1, #reader h2, #reader h3 { font-family: var(--font-display); line-height: 1.25; text-wrap: balance; }
+  #reader a { color: var(--accent); }
+  #reader a.wiki { text-decoration: none; border-bottom: 1px dashed var(--accent); }
+  .embed { font: 13px var(--font-mono); color: var(--muted); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1px 6px; }
+  #reader pre { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px; overflow-x: auto; }
+  #reader code { font-family: var(--font-mono); font-size: .92em; }
+  #reader blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--rule); color: var(--muted); }
+  #reader table { border-collapse: collapse; display: block; overflow-x: auto; }
+  #reader td, #reader th { border: 1px solid var(--rule); padding: 4px 8px; }
+  #reader img { max-width: 100%; }
+  #reader li input[type=checkbox] { margin-right: 6px; }
+  .frontmatter { font: 13px/1.5 var(--font-mono); color: var(--muted); background: var(--surface);
+    border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; margin: 8px 0 14px; }
+
+  .slot { display: block; margin: 12px 0; }
+  .slot img, .slot video { display: block; max-width: 100%; height: auto; border-radius: 6px; background: var(--surface); }
+  .slot audio { width: 100%; }
+  .card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--rule);
+    border-radius: 10px; background: var(--surface); font-size: 14px; }
+  .card .kind { font: 500 11px/1 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+  .card .fname { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+  .card .size { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .card a { color: var(--accent); }
+  .card button { padding: 7px 10px; font-size: 14px; }
+  .transclude { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin: 12px 0; }
+  .transclude .from { font-size: 12px; color: var(--muted); }
+  .drawing { background: #ffffff; border: 1px solid var(--rule); border-radius: 8px; padding: 8px; overflow: auto; }
+  .drawing svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .pdfpages canvas { display: block; width: 100%; height: auto; margin: 0 0 8px; border: 1px solid var(--rule); background: #fff; }
+  .muted { color: var(--muted); font-size: 14px; }
+
+  #updateBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 12px;
+    background: var(--ink); color: var(--paper); box-shadow: 0 6px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+  #updateBar span { white-space: nowrap; }
+  #updateBar button { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  footer { max-width: 760px; margin: 0 auto; padding: 0 16px 24px; font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+  footer button { font-size: 12px; padding: 5px 8px; }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <button id="backBtn" class="hidden" type="button" aria-label="Back">←</button>
+  <h1 id="title">2nd Brain Notes</h1>
+  <span id="state" class="state" aria-live="polite"></span>
+  <button id="modeBtn" class="hidden" type="button">Edit</button>
+  <button id="newBtn" class="primary hidden" type="button">New note</button>
+</header>
+
+<main>
+  <div id="problem" class="notice hidden" role="alert"></div>
+
+  <section id="welcome" class="welcome hidden">
+    <img src="icon-192.png" alt="">
+    <h2>Your 2nd Brain, on every device</h2>
+    <p id="welcomeText">Sign in with the Google account that holds your vault. Notes are read and saved straight in Google Drive; nothing is stored on this device.</p>
+    <div class="row"><button id="signInBtn" class="primary" type="button">Sign in with Google</button></div>
+  </section>
+
+  <section id="browser" class="hidden">
+    <form class="row hidden" id="newForm">
+      <input id="newName" placeholder="Name of the new note" autocomplete="off">
+      <button class="primary" type="submit">Create</button>
+    </form>
+    <form class="row" id="searchForm">
+      <input id="q" placeholder="Search file names" autocomplete="off" type="search">
+      <button type="submit">Search</button>
+    </form>
+    <div class="crumbs" id="crumbs"></div>
+    <ul class="list" id="list"></ul>
+  </section>
+
+  <section id="noteView" class="hidden">
+    <div id="conflict" class="notice hidden">
+      <b>This note changed somewhere else after you opened it.</b>
+      Probably on your laptop. Your edits are still here and have not been saved.
+      <div class="row">
+        <button id="loadTheirs" type="button">Load the other version</button>
+        <button id="keepMine" type="button">Save my version over it</button>
+      </div>
+    </div>
+    <div id="reader"></div>
+    <textarea id="editor" class="hidden" spellcheck="true" autocapitalize="sentences" aria-label="Note text"></textarea>
+  </section>
+</main>
+
+<footer id="footer">
+  <span id="versionLabel"></span>
+  <button id="checkUpdateBtn" type="button">Check for update</button>
+</footer>
+
+<div id="updateBar" class="hidden" role="status">
+  <span>A new version is ready.</span>
+  <button id="applyUpdateBtn" type="button">Update now</button>
+</div>
+
+<script src="config.js"></script>
+<script src="demo-data.js"></script>
+<script src="drive.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
