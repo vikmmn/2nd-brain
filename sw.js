@@ -1,6 +1,6 @@
 // Keeps the installed app exactly as it is until you tap "Update now".
 // Releasing a new version = change VERSION below (and in config.js), then publish.
-var VERSION = '1.0.1';
+var VERSION = '1.0.2';
 var SHELL_CACHE = 'shell-' + VERSION;
 var LIB_CACHE = 'libs-v1';
 var SHELL = [

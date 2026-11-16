@@ -4,7 +4,7 @@ A small installable web app for reading and editing an Obsidian vault kept in Go
 from a phone, tablet or laptop. Notes are read from and saved straight back into Google Drive
 (the same file, edited in place). Nothing from the vault is stored on the device.
 
-- Opens at the "0. 2nd Brain" folder (change in `config.js`, or with "Open the app in this folder from now on").
+- Opens at the vault (03. Readables › Vik Vault 20220114) (change in `config.js`, or with "Open the app in this folder from now on").
 - Read and Edit modes, autosave 1.5 s after typing stops, and a warning instead of overwriting if
   the note changed on another device.
 - Shows embedded images, PDFs, video, audio, Excalidraw drawings and embedded notes.

@@ -36,6 +36,7 @@
   function home() {
     var h = null;
     try { h = JSON.parse(localStorage.getItem('home-folder') || 'null'); } catch (e) {}
+    if (h && h.id === '16FHBAxU1PocgsN_EDWK4AHCw3LFVqUn_') h = null; // the old "0. 2nd Brain" folder; the vault moved
     return h || { id: CFG.HOME_FOLDER_ID, name: CFG.HOME_FOLDER_NAME };
   }
   function show(view) {
