@@ -8,5 +8,5 @@ window.APP_CONFIG = {
   HOME_FOLDER_NAME: '0. 2nd Brain',
 
   // Shown in the app's footer. Bump together with VERSION in sw.js for every approved release.
-  VERSION: '1.0.0'
+  VERSION: '1.0.1'
 };

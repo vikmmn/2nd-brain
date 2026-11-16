@@ -20,6 +20,22 @@
   // ---------------- Real Google Drive ----------------
   function RealDrive() {
     var token = null, expiresAt = 0, client = null;
+    // The sign-in is kept on this device until Google's hour runs out, so closing the app doesn't sign you out.
+    var TOKEN_KEY = 'drive-token';
+    try {
+      var saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+      if (saved && saved.expiresAt > Date.now()) { token = saved.token; expiresAt = saved.expiresAt; }
+    } catch (e) {}
+    function account() { try { return localStorage.getItem('google-account') || ''; } catch (e) { return ''; } }
+    // Remember which Google account this is, so renewing skips Google's account picker.
+    async function learnAccount() {
+      if (account()) return;
+      try {
+        var r = await fetch(API + '/about?fields=user(emailAddress)', { headers: { Authorization: 'Bearer ' + token } });
+        var u = (await r.json()).user;
+        if (u && u.emailAddress) localStorage.setItem('google-account', u.emailAddress);
+      } catch (e) {}
+    }
 
     function loadGis() {
       if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
@@ -43,7 +59,11 @@
           if (r.error) return reject(fail('signin', r.error_description || r.error));
           token = r.access_token;
           expiresAt = Date.now() + (Number(r.expires_in || 3600) - 120) * 1000;
-          try { localStorage.setItem('signed-in-before', '1'); } catch (e) {}
+          try {
+            localStorage.setItem('signed-in-before', '1');
+            localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: token, expiresAt: expiresAt }));
+          } catch (e) {}
+          learnAccount();
           resolve();
         };
         client.error_callback = function (e) {
@@ -53,7 +73,9 @@
         };
         var before = false;
         try { before = localStorage.getItem('signed-in-before') === '1'; } catch (e) {}
-        client.requestAccessToken({ prompt: before ? '' : 'consent' });
+        var opts = { prompt: before ? '' : 'consent' };
+        if (before && account()) opts.hint = account();
+        client.requestAccessToken(opts);
       });
     }
 
@@ -67,7 +89,7 @@
       var r;
       try { r = await fetch(url, Object.assign({}, opts, { headers: headers })); }
       catch (e) { throw fail('offline', 'No internet connection, or Google Drive could not be reached.'); }
-      if (r.status === 401) { token = null; throw fail('auth', 'Your Google sign-in has ended. Please sign in again.'); }
+      if (r.status === 401) { token = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} throw fail('auth', 'Your Google sign-in has ended. Please sign in again.'); }
       if (!r.ok) {
         var msg = r.statusText;
         try { msg = (await r.json()).error.message || msg; } catch (e) {}
@@ -95,6 +117,7 @@
       signIn: signIn,
       signedIn: signedIn,
       minutesLeft: minutesLeft,
+      signedInBefore: function () { try { return localStorage.getItem('signed-in-before') === '1'; } catch (e) { return false; } },
       list: function (folderId) { return query("'" + qs(folderId) + "' in parents and trashed = false"); },
       get: async function (id) { return (await api(API + '/files/' + id + '?fields=' + FIELDS)).json(); },
       readBytes: async function (id) { return new Uint8Array(await (await api(API + '/files/' + id + '?alt=media')).arrayBuffer()); },
@@ -175,6 +198,7 @@
       demo: true,
       signIn: function () { signed = true; return wait(); },
       signedIn: function () { return signed; },
+      signedInBefore: function () { return false; },
       minutesLeft: function () { return 60; },
       list: function (folderId) { return wait(live().filter(function (f) { return f.parents[0] === folderId; }).map(meta)); },
       get: function (id) { return files[id] ? wait(meta(files[id])) : Promise.reject(fail('notfound', 'File not found')); },

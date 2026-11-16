@@ -80,7 +80,7 @@
 
   // Renew the Google sign-in quietly while the person is tapping around, before it runs out.
   async function keepSignedIn() {
-    if (Drive.demo || Drive.minutesLeft() > 8) return;
+    if (Drive.demo || (Drive.signedIn() && Drive.minutesLeft() > 8)) return;
     try { await Drive.signIn(); } catch (e) {}
   }
 
@@ -650,6 +650,15 @@
       : 'The Google sign-in key has not been added yet, so this opens a pretend vault you can try out.';
     $('signInBtn').textContent = 'Open the demo vault';
   }
-  show('welcome');
   $('title').textContent = '2nd Brain Notes';
+  if (!Drive.demo && Drive.signedIn()) {
+    // Still signed in from earlier (the sign-in lasts about an hour): go straight to the notes.
+    openFolder(home(), false);
+  } else {
+    if (!Drive.demo && Drive.signedInBefore()) {
+      $('welcomeText').textContent = 'Welcome back. Tap Continue to renew your Google sign-in; it only takes a moment.';
+      $('signInBtn').textContent = 'Continue';
+    }
+    show('welcome');
+  }
 })();
